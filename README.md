@@ -135,3 +135,9 @@ Release title: **frontend design v1.2**. Git tag: **`v1.2`**. Package version: *
 - Project assets retain their original ownership; consult [their sources](public/projects/SOURCES.md) before reuse. Third-party notices do not license the whole repository.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the review checklist and release conventions.
+
+## [Contributors](https://github.com/DDHDDHD3/kobac_systems/graphs/contributors)
+
+Collaborating developer: [uncannystranger (Abdullahi Mohamud)](https://github.com/uncannystranger).
+
+GitHub populates the contributor graph automatically from commits attributed to each developer's account. To appear there, commits must use an email address verified on that GitHub account and be pushed to the repository's default branch, typically by merging a pull request.
