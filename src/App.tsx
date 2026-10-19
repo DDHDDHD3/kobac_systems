@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { PublicWebsite } from './components/PublicWebsite';
+import { KobacCompanion } from './components/KobacCompanion';
+import { LazyMotion, MotionConfig, m } from 'motion/react';
+const loadMotionFeatures = () => import('./components/motion-features').then(module => module.default);
 
 // ==========================================
 // BRAND LOGO COMPONENT
@@ -21,7 +25,7 @@ function KobacLogo({ className = "", showText = true, darkText = false, size = "
 // TYPES & INTERFACES
 // ==========================================
 
-interface User {
+export interface User {
   id: string;
   name: string;
   title: string;
@@ -176,7 +180,7 @@ interface AuditLog {
   timestamp: string;
 }
 
-interface PortfolioItem {
+export interface PortfolioItem {
   id: string;
   title: string;
   project_title?: string;
@@ -195,7 +199,7 @@ interface PortfolioItem {
   result?: string;
 }
 
-interface CompanySettings {
+export interface CompanySettings {
   id: string;
   company_name: string;
   tagline: string;
@@ -248,6 +252,7 @@ export default function App() {
   const [publicCompanySettings, setPublicCompanySettings] = useState<CompanySettings | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [publicDataStatus, setPublicDataStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
@@ -263,9 +268,10 @@ export default function App() {
       setPublicPortfolio(data.portfolio);
       setPublicTeam(data.team);
       setPublicCompanySettings(data.settings);
+      setPublicDataStatus('ready');
     } catch (err) {
       console.error('Failed to load public website data:', err);
-      showNotification(err instanceof Error ? err.message : 'Failed to load public website data.', 'error');
+      setPublicDataStatus('unavailable');
     }
   };
 
@@ -324,49 +330,26 @@ export default function App() {
         if (await fetchAllData()) setCurrentUser(sessionData.user);
       } catch (err) {
         console.error('Failed to restore staff session:', err);
-        showNotification(err instanceof Error ? err.message : 'Unable to restore staff session.', 'error');
+        // The public page remains usable when staff-session restoration is unavailable.
       }
     })();
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F6F8F7] text-[#17231F] font-sans antialiased selection:bg-[#F5A623] selection:text-[#0B3B2C]">
+    <LazyMotion features={loadMotionFeatures} strict><MotionConfig reducedMotion="user"><div className="kobac-app min-h-screen font-sans antialiased">
       {/* Notification Toast */}
       {notification && (
-        <div className={`fixed top-6 right-6 z-50 px-6 py-3 rounded-xl shadow-2xl text-white font-medium flex items-center gap-3 animate-bounce ${
+        <div className={`fixed top-6 right-6 z-[80] px-6 py-3 rounded-xl shadow-2xl text-white font-medium flex items-center gap-3 toast-notification ${
           notification.type === 'success' ? 'bg-[#0B3B2C]' : 'bg-red-600'
         }`}>
-          <span>{notification.message}</span>
+          <span role="status" aria-live="polite">{notification.message}</span>
         </div>
       )}
 
-      {/* Mode Switcher Banner */}
-      <div className="bg-[#0B3B2C] text-white px-4 py-2.5 text-sm flex flex-col gap-3 border-b border-[#144f3d] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <KobacLogo size="small" />
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
-          <button 
-            onClick={() => setActivePortal('public')}
-            className={`whitespace-nowrap px-3.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-              activePortal === 'public' ? 'bg-[#F5A623] text-[#0B3B2C]' : 'text-gray-300 hover:text-white hover:bg-[#144f3d]'
-            }`}
-          >
-            Public Website
-          </button>
-          <button 
-            onClick={() => setActivePortal('portal')}
-            className={`whitespace-nowrap px-3.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-              activePortal === 'portal' ? 'bg-[#F5A623] text-[#0B3B2C]' : 'text-gray-300 hover:text-white hover:bg-[#144f3d]'
-            }`}
-          >
-            Operations Portal & CRM
-          </button>
-        </div>
-      </div>
+      {activePortal === 'portal' && <div className="workspace-switcher"><button onClick={() => setActivePortal('public')} aria-label="Return to public website"><KobacLogo darkText /><span>← Back to website</span></button><span className="workspace-label">KOBAC / OPERATIONS WORKSPACE</span></div>}
 
       {activePortal === 'public' ? (
-        <PublicWebsite portfolio={publicPortfolio} companySettings={publicCompanySettings} users={publicTeam} setActivePortal={setActivePortal} onRefresh={refreshAllData} />
+        <PublicWebsite portfolio={publicPortfolio} companySettings={publicCompanySettings} users={publicTeam} dataStatus={publicDataStatus} setActivePortal={setActivePortal} renderWizard={navigate => <ProjectRequestWizard setSubPage={navigate} />} />
       ) : !currentUser ? (
         <LoginScreen onLoginSuccess={handleLoginSuccess} showNotification={showNotification} />
       ) : (
@@ -401,570 +384,13 @@ export default function App() {
 
       {/* Floating AI Chat Assistant */}
       <AiChatAssistant />
-    </div>
+    </div></MotionConfig></LazyMotion>
   );
 }
 
 // ==========================================
 // PUBLIC WEBSITE COMPONENT
 // ==========================================
-
-function PublicWebsite({ portfolio, companySettings, users, setActivePortal, onRefresh }: { 
-  portfolio: PortfolioItem[]; 
-  companySettings: CompanySettings | null; 
-  users: User[];
-  setActivePortal: (portal: 'public' | 'portal') => void;
-  onRefresh: () => void;
-}) {
-  const [subPage, setSubPage] = useState<'home' | 'services' | 'portfolio' | 'about' | 'contact' | 'wizard'>('home');
-  const [selectedCaseStudy, setSelectedCaseStudy] = useState<PortfolioItem | null>(null);
-  const [contactForm, setContactForm] = useState({ name: '', email: '', subject: '', message: '' });
-  const [submitted, setSubmitted] = useState(false);
-  const [contactError, setContactError] = useState('');
-  const [contactSubmitting, setContactSubmitting] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const handleContactSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setContactSubmitting(true);
-    setContactError('');
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contactForm)
-      });
-      if (res.ok) {
-        setSubmitted(true);
-        setContactForm({ name: '', email: '', subject: '', message: '' });
-      } else {
-        const data = await res.json();
-        throw new Error(data.error || 'Unable to send your message. Please try again.');
-      }
-    } catch (err) {
-      setContactError(err instanceof Error ? err.message : 'Unable to send your message. Please try again.');
-    } finally {
-      setContactSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div className="flex min-w-0 items-center gap-3 cursor-pointer" onClick={() => { setSubPage('home'); setSelectedCaseStudy(null); setMobileMenuOpen(false); }}>
-          {companySettings?.logo_url ? (
-            <img
-              src={companySettings.logo_url}
-              alt={companySettings.company_name || 'Company logo'}
-              className="h-10 max-w-40 object-contain"
-              onError={event => { event.currentTarget.src = '/kobac-logo-dark.png'; }}
-            />
-          ) : (
-            <KobacLogo showText={false} darkText />
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-black text-[#0B3B2C]">{companySettings?.company_name || 'KOBAC SYSTEMS'}</p>
-            <p className="max-w-52 truncate text-[10px] text-gray-500">{companySettings?.tagline || 'Enterprise IT & Digital Transformation Solutions'}</p>
-          </div>
-        </div>
-        <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-gray-600">
-          <button onClick={() => { setSubPage('home'); setSelectedCaseStudy(null); }} className={`hover:text-[#0B3B2C] transition-colors ${subPage === 'home' ? 'text-[#0B3B2C]' : ''}`}>Home</button>
-          <button onClick={() => { setSubPage('services'); setSelectedCaseStudy(null); }} className={`hover:text-[#0B3B2C] transition-colors ${subPage === 'services' ? 'text-[#0B3B2C]' : ''}`}>Services</button>
-          <button onClick={() => { setSubPage('portfolio'); setSelectedCaseStudy(null); }} className={`hover:text-[#0B3B2C] transition-colors ${subPage === 'portfolio' ? 'text-[#0B3B2C]' : ''}`}>Portfolio & Case Studies</button>
-          <button onClick={() => { setSubPage('about'); setSelectedCaseStudy(null); }} className={`hover:text-[#0B3B2C] transition-colors ${subPage === 'about' ? 'text-[#0B3B2C]' : ''}`}>About & Team</button>
-          <button onClick={() => { setSubPage('wizard'); setSelectedCaseStudy(null); }} className={`hover:text-[#0B3B2C] transition-colors ${subPage === 'wizard' ? 'text-[#0B3B2C]' : ''}`}>AI Project Scoper</button>
-          <button onClick={() => { setSubPage('contact'); setSelectedCaseStudy(null); }} className={`hover:text-[#0B3B2C] transition-colors ${subPage === 'contact' ? 'text-[#0B3B2C]' : ''}`}>Contact</button>
-        </nav>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setActivePortal('portal')} 
-            className="hidden sm:flex bg-[#0B3B2C] hover:bg-[#144f3d] text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-md transition-all items-center gap-2"
-          >
-            <span>Operations Portal</span>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-          </button>
-          <button 
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-gray-700 hover:text-[#0B3B2C] focus:outline-none"
-            aria-label="Toggle menu"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
-              )}
-            </svg>
-          </button>
-        </div>
-      </header>
-
-      {/* Mobile Menu Dropdown */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-gray-200 px-6 py-4 space-y-3 shadow-lg animate-in slide-in-from-top">
-          <button onClick={() => { setSubPage('home'); setMobileMenuOpen(false); setSelectedCaseStudy(null); }} className="block w-full text-left font-semibold text-gray-700 py-2">Home</button>
-          <button onClick={() => { setSubPage('services'); setMobileMenuOpen(false); setSelectedCaseStudy(null); }} className="block w-full text-left font-semibold text-gray-700 py-2">Services</button>
-          <button onClick={() => { setSubPage('portfolio'); setMobileMenuOpen(false); setSelectedCaseStudy(null); }} className="block w-full text-left font-semibold text-gray-700 py-2">Portfolio & Case Studies</button>
-          <button onClick={() => { setSubPage('about'); setMobileMenuOpen(false); setSelectedCaseStudy(null); }} className="block w-full text-left font-semibold text-gray-700 py-2">About & Team Permissions</button>
-          <button onClick={() => { setSubPage('wizard'); setMobileMenuOpen(false); setSelectedCaseStudy(null); }} className="block w-full text-left font-semibold text-gray-700 py-2">AI Project Scoper</button>
-          <button onClick={() => { setSubPage('contact'); setMobileMenuOpen(false); setSelectedCaseStudy(null); }} className="block w-full text-left font-semibold text-gray-700 py-2">Contact</button>
-          <button onClick={() => { setActivePortal('portal'); setMobileMenuOpen(false); }} className="w-full bg-[#0B3B2C] text-white py-2.5 rounded-xl font-bold text-center block mt-2">Operations Portal</button>
-        </div>
-      )}
-
-      {/* Main Content */}
-      {subPage === 'home' && (
-        <div>
-          {/* Hero Section */}
-          <section className="relative bg-gradient-to-br from-[#0B3B2C] via-[#0e4d3a] to-[#17231F] text-white py-24 px-6 overflow-hidden">
-            <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
-              <div className="space-y-6">
-                <span className="bg-[#F5A623]/20 text-[#F5A623] border border-[#F5A623]/30 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
-                  Digital Solutions Built for Somalia
-                </span>
-                <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">
-                  Technology That Moves <span className="text-[#F5A623]">Your Business Forward</span>
-                </h1>
-                <p className="text-lg text-gray-300 font-normal leading-relaxed">
-                  KOBAC SYSTEMS builds reliable digital solutions that help businesses and institutions across Somalia streamline their operations, organize their data, improve service delivery, and manage their day-to-day activities more efficiently. We provide practical business software, digital transformation services, and secure technology solutions tailored to local needs.
-                </p>
-                <div className="flex flex-wrap gap-4 pt-4">
-                  <button onClick={() => setSubPage('wizard')} className="bg-[#F5A623] hover:bg-[#e0961d] text-[#0B3B2C] px-8 py-3.5 rounded-xl font-bold shadow-xl transition-all transform hover:-translate-y-0.5">
-                    Launch AI Project Scoper
-                  </button>
-                  <button onClick={() => setSubPage('portfolio')} className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-3.5 rounded-xl font-semibold transition-all">
-                    Explore Case Studies
-                  </button>
-                </div>
-              </div>
-              <div className="relative">
-                <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-2xl space-y-6">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                    <span className="text-sm font-semibold text-gray-300">Live Enterprise Hub</span>
-                    <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                      <p className="text-xs text-gray-400">Active Clients</p>
-                      <p className="text-2xl font-black text-[#F5A623] mt-1">48+</p>
-                    </div>
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                      <p className="text-xs text-gray-400">Delivered Projects</p>
-                      <p className="text-2xl font-black text-[#F5A623] mt-1">120+</p>
-                    </div>
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                      <p className="text-xs text-gray-400">Uptime SLA</p>
-                      <p className="text-2xl font-black text-emerald-400 mt-1">99.99%</p>
-                    </div>
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                      <p className="text-xs text-gray-400">Security Audit</p>
-                      <p className="text-2xl font-black text-emerald-400 mt-1">Passed</p>
-                    </div>
-                  </div>
-                  <button onClick={() => setActivePortal('portal')} className="w-full bg-[#F5A623]/20 hover:bg-[#F5A623]/30 border border-[#F5A623]/40 text-[#F5A623] py-3 rounded-xl font-bold text-center flex items-center justify-center gap-2 transition-all">
-                    Open Operations Dashboard
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 12h14m-7-7 7 7-7 7"/></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Services Highlights */}
-          <section className="py-20 px-6 max-w-6xl mx-auto">
-            <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
-              <h2 className="text-3xl font-black text-[#0B3B2C]">Core Enterprise Capabilities</h2>
-              <p className="text-gray-600">We architect robust, scalable systems tailored to government agencies, financial institutions, and enterprise corporations.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="bg-[#F6F8F7] p-8 rounded-2xl border border-gray-200 hover:shadow-xl transition-all group">
-                <div className="w-14 h-14 rounded-2xl bg-[#0B3B2C] text-[#F5A623] flex items-center justify-center font-bold text-2xl mb-6 shadow-md group-hover:scale-110 transition-transform">01</div>
-                <h3 className="text-xl font-bold text-[#0B3B2C] mb-3">Enterprise CRM & Client Operations</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">Centralize client communications, negotiations, contract lifecycle management, and secure document vaults.</p>
-              </div>
-              <div className="bg-[#F6F8F7] p-8 rounded-2xl border border-gray-200 hover:shadow-xl transition-all group">
-                <div className="w-14 h-14 rounded-2xl bg-[#0B3B2C] text-[#F5A623] flex items-center justify-center font-bold text-2xl mb-6 shadow-md group-hover:scale-110 transition-transform">02</div>
-                <h3 className="text-xl font-bold text-[#0B3B2C] mb-3">Custom Software & Cloud Infrastructure</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">Full-stack web and mobile application engineering, cloud migration, and automated CI/CD security pipelines.</p>
-              </div>
-              <div className="bg-[#F6F8F7] p-8 rounded-2xl border border-gray-200 hover:shadow-xl transition-all group">
-                <div className="w-14 h-14 rounded-2xl bg-[#0B3B2C] text-[#F5A623] flex items-center justify-center font-bold text-2xl mb-6 shadow-md group-hover:scale-110 transition-transform">03</div>
-                <h3 className="text-xl font-bold text-[#0B3B2C] mb-3">Governance & Board Management</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">Secure document sharing, board member governance tracking, meeting minutes, and compliance audit logging.</p>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {subPage === 'services' && (
-        <div className="py-20 px-6 max-w-5xl mx-auto space-y-16 animate-in fade-in">
-          <div className="text-center max-w-3xl mx-auto space-y-4">
-            <span className="bg-[#0B3B2C]/10 text-[#0B3B2C] px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Our Comprehensive Services</span>
-            <h1 className="text-4xl md:text-5xl font-black text-[#0B3B2C]">Turning Business Challenges into Real Solutions</h1>
-            <p className="text-lg text-gray-600 leading-relaxed">
-              We help businesses and institutions identify operational challenges, improve the way they work, and turn ideas into practical digital solutions that deliver real value.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-[#F6F8F7] border border-gray-200 p-8 md:p-10 rounded-3xl shadow-sm space-y-6 flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#0B3B2C] text-[#F5A623] flex items-center justify-center font-bold text-xl shadow-md">01</div>
-                <h3 className="text-2xl font-bold text-[#0B3B2C]">Digital Transformation & Business Solutions</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  We analyze business challenges and design practical solutions that improve efficiency, simplify operations, and support sustainable growth.
-                </p>
-              </div>
-              <ul className="space-y-3 text-sm text-gray-700 font-medium pt-4 border-t border-gray-200">
-                <li className="flex items-center gap-3"><span className="text-[#F5A623] font-bold text-base">✓</span> Business Process Improvement & Automation</li>
-                <li className="flex items-center gap-3"><span className="text-[#F5A623] font-bold text-base">✓</span> Digital Transformation & Operational Efficiency</li>
-                <li className="flex items-center gap-3"><span className="text-[#F5A623] font-bold text-base">✓</span> Business Analysis & Solution Planning</li>
-              </ul>
-            </div>
-
-            <div className="bg-[#F6F8F7] border border-gray-200 p-8 md:p-10 rounded-3xl shadow-sm space-y-6 flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#0B3B2C] text-[#F5A623] flex items-center justify-center font-bold text-xl shadow-md">02</div>
-                <h3 className="text-2xl font-bold text-[#0B3B2C]">Custom Business Systems & Applications</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  We design and build tailored digital systems that solve real-world problems, organize business operations, and help organizations manage their daily activities more effectively.
-                </p>
-              </div>
-              <ul className="space-y-3 text-sm text-gray-700 font-medium pt-4 border-t border-gray-200">
-                <li className="flex items-center gap-3"><span className="text-[#F5A623] font-bold text-base">✓</span> Business Management Systems</li>
-                <li className="flex items-center gap-3"><span className="text-[#F5A623] font-bold text-base">✓</span> School & Educational Management Systems</li>
-                <li className="flex items-center gap-3"><span className="text-[#F5A623] font-bold text-base">✓</span> Customer, Sales & Inventory Management Solutions</li>
-                <li className="flex items-center gap-3"><span className="text-[#F5A623] font-bold text-base">✓</span> Document & Records Management Systems</li>
-                <li className="flex items-center gap-3"><span className="text-[#F5A623] font-bold text-base">✓</span> Custom Web Applications & Digital Platforms</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 p-8 md:p-12 rounded-3xl shadow-sm space-y-6">
-            <div className="text-center max-w-2xl mx-auto space-y-2">
-              <h3 className="text-3xl font-black text-[#0B3B2C]">From Ideas to Real Solutions</h3>
-              <p className="text-sm text-gray-600">Every project begins with understanding the client's needs. We identify the problem, plan the right solution, build a system around real business requirements, and refine it to support practical, measurable improvements.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
-              <div className="bg-[#F6F8F7] p-6 rounded-2xl border border-gray-200 space-y-2">
-                <span className="text-[#F5A623] font-black text-lg">✓</span>
-                <h4 className="font-bold text-sm text-[#0B3B2C]">Problem Identification & Requirements Analysis</h4>
-              </div>
-              <div className="bg-[#F6F8F7] p-6 rounded-2xl border border-gray-200 space-y-2">
-                <span className="text-[#F5A623] font-black text-lg">✓</span>
-                <h4 className="font-bold text-sm text-[#0B3B2C]">Solution Design & Implementation</h4>
-              </div>
-              <div className="bg-[#F6F8F7] p-6 rounded-2xl border border-gray-200 space-y-2">
-                <span className="text-[#F5A623] font-black text-lg">✓</span>
-                <h4 className="font-bold text-sm text-[#0B3B2C]">Testing, Deployment & Continuous Improvement</h4>
-              </div>
-              <div className="bg-[#F6F8F7] p-6 rounded-2xl border border-gray-200 space-y-2">
-                <span className="text-[#F5A623] font-black text-lg">✓</span>
-                <h4 className="font-bold text-sm text-[#0B3B2C]">Ongoing Technical Support & Maintenance</h4>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {subPage === 'portfolio' && !selectedCaseStudy && (
-        <div className="py-20 px-6 max-w-6xl mx-auto space-y-12 animate-in fade-in">
-          <div className="text-center max-w-2xl mx-auto space-y-4">
-            <span className="bg-[#0B3B2C]/10 text-[#0B3B2C] px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Verified Case Studies</span>
-            <h1 className="text-4xl font-black text-[#0B3B2C]">Portfolio & Real-World Solutions</h1>
-            <p className="text-gray-600">Discover how Kobac Systems partners with institutions and enterprises to solve operational challenges and deliver practical digital solutions.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {portfolio.map(item => (
-              <div 
-                key={item.id} 
-                onClick={() => setSelectedCaseStudy(item)}
-                className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between group"
-              >
-                <div className="p-8 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="bg-[#0B3B2C]/10 text-[#0B3B2C] text-xs font-bold px-3 py-1 rounded-full">{item.category}</span>
-                    <span className="text-xs text-gray-500 font-medium">{item.industry}</span>
-                  </div>
-                  <h3 className="text-2xl font-black text-[#0B3B2C] group-hover:text-[#F5A623] transition-colors">{item.title}</h3>
-                  {item.project_title && item.project_title.trim().toLowerCase() !== item.summary?.trim().toLowerCase() && (
-                    <p className="text-sm font-bold text-gray-700">{item.project_title}</p>
-                  )}
-                  <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">{item.summary || item.description}</p>
-                </div>
-                <div className="p-8 pt-0 flex items-center justify-between border-t border-gray-100 bg-gray-50/50 mt-4">
-                  <span className="text-xs font-bold text-gray-500">Client: {item.client}</span>
-                  <span className="text-sm font-bold text-[#0B3B2C] group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                    View Case Study &rarr;
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {subPage === 'portfolio' && selectedCaseStudy && (
-        <div className="py-20 px-6 max-w-4xl mx-auto space-y-12 animate-in fade-in">
-          <button 
-            onClick={() => setSelectedCaseStudy(null)}
-            className="text-sm font-bold text-[#0B3B2C] hover:underline flex items-center gap-2"
-          >
-            &larr; Back to Portfolio & Case Studies
-          </button>
-
-          <div className="bg-white border border-gray-200 rounded-3xl p-8 md:p-12 shadow-xl space-y-8">
-            <div className="space-y-4 border-b border-gray-200 pb-8">
-              <span className="bg-[#F5A623]/20 text-[#0B3B2C] text-xs font-bold px-3 py-1 rounded-full uppercase">{selectedCaseStudy.category}</span>
-              <h1 className="text-3xl md:text-5xl font-black text-[#0B3B2C]">{selectedCaseStudy.title}</h1>
-              <p className="text-lg font-semibold text-gray-700">{selectedCaseStudy.project_title || selectedCaseStudy.summary}</p>
-              <div className="flex flex-wrap gap-6 text-xs text-gray-500 pt-2 font-medium">
-                <span><strong>Client:</strong> {selectedCaseStudy.client}</span>
-                <span><strong>Industry:</strong> {selectedCaseStudy.industry}</span>
-              </div>
-            </div>
-
-            <div className="space-y-6 text-gray-700 leading-relaxed">
-              <div>
-                <h3 className="text-xl font-bold text-[#0B3B2C] mb-3">The Business Challenge</h3>
-                <p className="bg-gray-50 p-6 rounded-2xl border border-gray-200 text-sm leading-relaxed">
-                  {selectedCaseStudy.problem || selectedCaseStudy.description}
-                </p>
-              </div>
-
-              <div>
-                <h3 className="text-xl font-bold text-[#0B3B2C] mb-3">The Solution Delivered by KOBAC SYSTEMS</h3>
-                <p className="text-sm leading-relaxed mb-4">
-                  {selectedCaseStudy.solution || 'KOBAC SYSTEMS designed and delivered a tailored digital workflow solution to streamline operations and enhance organization.'}
-                </p>
-                {selectedCaseStudy.key_improvements && selectedCaseStudy.key_improvements.length > 0 && (
-                  <ul className="space-y-2 bg-[#F6F8F7] p-6 rounded-2xl border border-gray-200 text-sm">
-                    {selectedCaseStudy.key_improvements.map((imp, idx) => (
-                      <li key={idx} className="flex items-start gap-3">
-                        <span className="text-[#F5A623] font-bold text-lg">&#10003;</span>
-                        <span>{imp}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-xl font-bold text-[#0B3B2C] mb-3">Business Impact</h3>
-                <p className="bg-emerald-50 text-emerald-900 p-6 rounded-2xl border border-emerald-200 text-sm leading-relaxed font-medium">
-                  {selectedCaseStudy.business_impact || selectedCaseStudy.result || 'The solution successfully helped the organization achieve higher operational efficiency and reliable recordkeeping.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-8 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div>
-                <h4 className="font-bold text-[#0B3B2C]">Interested in a similar solution?</h4>
-                <p className="text-xs text-gray-500">Contact our engineering team to discuss your requirements.</p>
-              </div>
-              <button 
-                onClick={() => setSubPage('contact')}
-                className="bg-[#0B3B2C] hover:bg-[#144f3d] text-white px-8 py-3 rounded-xl font-bold text-sm shadow-lg transition-all"
-              >
-                Discuss a Similar Project &rarr;
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {subPage === 'about' && (
-        <div className="py-20 px-6 max-w-5xl mx-auto space-y-16 animate-in fade-in">
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <span className="bg-[#0B3B2C]/10 text-[#0B3B2C] px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider">About Kobac Systems</span>
-            <h1 className="text-4xl font-black text-[#0B3B2C]">Enterprise Excellence & Leadership</h1>
-            <p className="text-lg text-gray-600">Engineering the digital backbone for modern enterprises, educational institutions, and government agencies across Somalia.</p>
-          </div>
-          <div className="bg-[#F6F8F7] p-8 md:p-12 rounded-3xl border border-gray-200 space-y-6 text-gray-700 leading-relaxed shadow-sm">
-            <h3 className="text-2xl font-bold text-[#0B3B2C]">Our Mission & Vision</h3>
-            <p>
-              Founded with a mission to bridge the technology gap in emerging markets, Kobac Systems brings elite software engineering, rigorous project management, and enterprise-grade security to our clients.
-            </p>
-            <p>
-              Our multidisciplinary team works hand-in-hand with organizational leaders to deliver transparent, scalable, and impactful solutions tailored to local needs.
-            </p>
-          </div>
-
-          <div className="space-y-8">
-            <div className="text-center space-y-2">
-              <h2 className="text-3xl font-black text-[#0B3B2C]">Team & Role-Based Permissions</h2>
-              <p className="text-sm text-gray-600">Live directory of authorized operational personnel and their assigned system permissions.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {users.map(member => (
-                <div key={member.id} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-md hover:shadow-xl transition-all space-y-4 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-4">
-                      {member.avatar ? (
-                        <img src={member.avatar} alt={member.name} className="w-14 h-14 rounded-2xl object-cover shadow-md" />
-                      ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-[#0B3B2C] text-[#F5A623] flex items-center justify-center font-black text-xl shadow-md">
-                          {member.name.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <h4 className="font-bold text-[#0B3B2C] text-lg leading-tight">{member.name}</h4>
-                        <p className="text-xs font-semibold text-[#F5A623] mt-0.5">{member.title}</p>
-                      </div>
-                    </div>
-                    <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-100 text-xs space-y-1.5 font-medium text-gray-600">
-                      <p><strong>Department:</strong> {member.department}</p>
-                      <p><strong>System Role:</strong> <span className="text-[#0B3B2C] font-bold">{member.role}</span></p>
-                      <p><strong>Email:</strong> {member.email}</p>
-                      <p><strong>Phone:</strong> {member.phone || 'N/A'}</p>
-                    </div>
-                    {member.responsibilities && (
-                      <p className="text-xs text-gray-600 leading-relaxed italic">
-                        "{member.responsibilities}"
-                      </p>
-                    )}
-                  </div>
-                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${member.active ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                      {member.active ? 'Active Access' : 'Inactive'}
-                    </span>
-                    <span className="text-[11px] font-semibold text-gray-400">ID: {member.role}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {subPage === 'wizard' && (
-        <ProjectRequestWizard setSubPage={setSubPage} />
-      )}
-
-      {subPage === 'contact' && (
-        <div className="py-20 px-6 max-w-3xl mx-auto space-y-8">
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl font-black text-[#0B3B2C]">Get in Touch</h1>
-            <p className="text-gray-600">Have a project in mind or need enterprise consulting? Contact us directly or send a message.</p>
-            <div className="flex flex-wrap justify-center gap-4 pt-2 text-sm font-bold text-[#0B3B2C]">
-              <span className="bg-[#F5A623]/20 px-4 py-2 rounded-xl">+252 61 5283292</span>
-              <span className="bg-[#F5A623]/20 px-4 py-2 rounded-xl">+252 61 7747801</span>
-              <span className="bg-[#F5A623]/20 px-4 py-2 rounded-xl">+252 61 4163362</span>
-            </div>
-          </div>
-          {submitted ? (
-            <div className="bg-emerald-50 border border-emerald-200 p-8 rounded-2xl text-center space-y-4">
-              <h3 className="text-2xl font-bold text-emerald-800">Message Received Successfully!</h3>
-              <p className="text-emerald-700">Thank you for reaching out. Our team will review your inquiry and get back to you within 24 hours.</p>
-              <button onClick={() => setSubmitted(false)} className="bg-[#0B3B2C] text-white px-6 py-2.5 rounded-xl font-semibold text-sm">Send Another Message</button>
-            </div>
-          ) : (
-            <form onSubmit={handleContactSubmit} className="bg-[#F6F8F7] p-8 rounded-2xl border border-gray-200 space-y-6">
-              {contactError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{contactError}</p>}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Your Name</label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={contactForm.name} 
-                    onChange={e => setContactForm({ ...contactForm, name: e.target.value })}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0B3B2C]"
-                    placeholder="Abdi Farah"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Email Address</label>
-                  <input 
-                    type="email" 
-                    required 
-                    value={contactForm.email} 
-                    onChange={e => setContactForm({ ...contactForm, email: e.target.value })}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0B3B2C]"
-                    placeholder="abdi@enterprise.so"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Subject</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={contactForm.subject} 
-                  onChange={e => setContactForm({ ...contactForm, subject: e.target.value })}
-                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0B3B2C]"
-                  placeholder="Enterprise CRM Integration"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Message</label>
-                <textarea 
-                  rows={5} 
-                  required 
-                  value={contactForm.message} 
-                  onChange={e => setContactForm({ ...contactForm, message: e.target.value })}
-                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0B3B2C]"
-                  placeholder="Describe your requirements..."
-                />
-              </div>
-              <button type="submit" disabled={contactSubmitting} className="w-full bg-[#0B3B2C] hover:bg-[#144f3d] disabled:opacity-60 text-white py-3.5 rounded-xl font-bold shadow-lg transition-all">
-                {contactSubmitting ? 'Sending...' : 'Send Inquiry'}
-              </button>
-            </form>
-          )}
-        </div>
-      )}
-
-      {/* Footer */}
-      <footer className="bg-[#0B3B2C] text-white py-12 px-6 mt-20">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              {companySettings?.logo_url ? (
-                <img
-                  src={companySettings.logo_url}
-                  alt={companySettings.company_name || 'Company logo'}
-                  className="h-10 max-w-40 object-contain"
-                  onError={event => { event.currentTarget.src = '/kobac-logo.png'; }}
-                />
-              ) : (
-                <KobacLogo showText={false} />
-              )}
-              <p className="text-sm font-bold text-white">{companySettings?.company_name || 'KOBAC SYSTEMS'}</p>
-            </div>
-            <p className="text-xs text-gray-300">{companySettings?.tagline || 'Empowering enterprises with intelligent software systems and secure operations.'}</p>
-          </div>
-          <div>
-            <h4 className="font-bold text-sm text-[#F5A623] uppercase mb-3">Quick Links</h4>
-            <ul className="space-y-2 text-xs text-gray-300">
-              <li><button onClick={() => setSubPage('home')}>Home</button></li>
-              <li><button onClick={() => setSubPage('services')}>Services</button></li>
-              <li><button onClick={() => setSubPage('portfolio')}>Portfolio & Case Studies</button></li>
-              <li><button onClick={() => setSubPage('about')}>About Us</button></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-bold text-sm text-[#F5A623] uppercase mb-3">Contact</h4>
-            <p className="text-xs text-gray-300">{companySettings?.emails?.[0] || 'contactkobacsystems@gmail.com'}</p>
-            {(companySettings?.phones?.length ? companySettings.phones : ['+252 61 5283292', '+252 61 7747801', '+252 61 4163362']).map(phone => (
-              <p key={phone} className="text-xs text-gray-300 mt-1">{phone}</p>
-            ))}
-            <p className="text-xs text-gray-300 mt-1">{companySettings?.location || 'Mogadishu, Somalia'}</p>
-          </div>
-          <div>
-            <h4 className="font-bold text-sm text-[#F5A623] uppercase mb-3">Operations Portal</h4>
-            <p className="text-xs text-gray-300 mb-3">Access internal enterprise dashboards, client CRM, contracts, and audit logs.</p>
-            <button onClick={() => setActivePortal('portal')} className="bg-[#F5A623] text-[#0B3B2C] px-4 py-2 rounded-lg font-bold text-xs">
-              Sign In to Portal
-            </button>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
 
 // ==========================================
 // AI PROJECT SCOPER WIZARD
@@ -987,6 +413,15 @@ function ProjectRequestWizard({ setSubPage }: { setSubPage: (p: 'home' | 'servic
   const [submitting, setSubmitting] = useState(false);
   const submissionKey = useRef(crypto.randomUUID());
   const submissionInProgress = useRef(false);
+  const scoperPanel = useRef<HTMLDivElement>(null);
+  const previousStep = useRef(step);
+  useEffect(() => {
+    if (previousStep.current !== step) {
+      scoperPanel.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+      scoperPanel.current?.focus({ preventScroll: true });
+      previousStep.current = step;
+    }
+  }, [step]);
   const challengeLength = formData.problemDescription.trim().length;
 
   const solutionTypes = [
@@ -1067,14 +502,15 @@ function ProjectRequestWizard({ setSubPage }: { setSubPage: (p: 'home' | 'servic
   };
 
   return (
-    <div className="py-20 px-6 max-w-3xl mx-auto space-y-8">
+    <div className="scoper-page py-20 px-6 max-w-3xl mx-auto space-y-8">
       <div className="text-center space-y-4">
         <span className="bg-[#0B3B2C]/10 text-[#0B3B2C] px-3 py-1 rounded-full text-xs font-bold uppercase">KOBAC SYSTEMS Business Solutions</span>
         <h1 className="text-4xl font-black text-[#0B3B2C]">AI Project Scoping Wizard</h1>
         <p className="text-gray-600">Describe your operational challenge to receive a practical digital solution recommendation tailored to your organization.</p>
       </div>
 
-      <div className="bg-[#F6F8F7] p-8 rounded-3xl border border-gray-200 shadow-sm space-y-6">
+      <div className="scoper-progress" aria-label={`Step ${step} of 3`}>{['Your solution', 'Your challenge', 'Your recommendation'].map((label, i) => <span key={label} className={step === i + 1 ? 'is-current' : step > i + 1 ? 'is-complete' : ''} aria-current={step === i + 1 ? 'step' : undefined}><b>0{i + 1}</b>{label}</span>)}</div>
+      <m.div ref={scoperPanel} tabIndex={-1} role="region" aria-label={`Project scoper step ${step}`} key={step} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .25 }} className="scoper-panel bg-[#F6F8F7] p-8 rounded-3xl border border-gray-200 shadow-sm space-y-6">
         {step === 1 && (
           <div className="space-y-6">
             <h3 className="text-xl font-bold text-[#0B3B2C]">Step 1: Select Your Business Solution</h3>
@@ -1082,6 +518,7 @@ function ProjectRequestWizard({ setSubPage }: { setSubPage: (p: 'home' | 'servic
               {solutionTypes.map(([type, description]) => (
                 <button
                   key={type}
+                  aria-pressed={formData.solutionType === type}
                   onClick={() => setFormData({ ...formData, solutionType: type })}
                   className={`p-4 rounded-xl border text-left transition-all ${
                     formData.solutionType === type ? 'bg-[#0B3B2C] text-white border-[#0B3B2C]' : 'bg-white text-gray-700 border-gray-200 hover:border-[#0B3B2C]'
@@ -1102,8 +539,8 @@ function ProjectRequestWizard({ setSubPage }: { setSubPage: (p: 'home' | 'servic
           <div className="space-y-6">
             <h3 className="text-xl font-bold text-[#0B3B2C]">Step 2: Understand Your Business Problem</h3>
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Organization Type</label>
-              <select 
+              <label className="block text-xs font-bold text-gray-700 uppercase mb-2" htmlFor="kobac-field-1">Organization Type</label>
+              <select id="kobac-field-1"
                 value={formData.organizationType}
                 onChange={e => setFormData({ ...formData, organizationType: e.target.value })}
                 className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0B3B2C]"
@@ -1118,8 +555,9 @@ function ProjectRequestWizard({ setSubPage }: { setSubPage: (p: 'home' | 'servic
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Describe Your Business Challenge <span className="text-red-600">*</span></label>
+              <label htmlFor="project-challenge" className="block text-xs font-bold text-gray-700 uppercase mb-2">Describe Your Business Challenge <span className="text-red-600">*</span></label>
               <textarea 
+                id="project-challenge"
                 rows={4}
                 required
                 minLength={MIN_PROJECT_CHALLENGE_LENGTH}
@@ -1177,10 +615,10 @@ function ProjectRequestWizard({ setSubPage }: { setSubPage: (p: 'home' | 'servic
               <h4 className="text-lg font-bold text-[#0B3B2C]">Review your details and save your inquiry</h4>
               <p className="text-sm text-gray-600">This saves your inquiry and AI recommendation only. KOBAC staff can review it in the Operations Portal under Communications &amp; Inquiries. It will not create a project automatically.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input required maxLength={160} value={contactDetails.name} onChange={e => setContactDetails({ ...contactDetails, name: e.target.value })} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm" placeholder="Your name" />
-                <input required maxLength={200} value={contactDetails.organizationName} onChange={e => setContactDetails({ ...contactDetails, organizationName: e.target.value })} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm" placeholder="Organization name" />
-                <input required type="email" maxLength={254} value={contactDetails.email} onChange={e => setContactDetails({ ...contactDetails, email: e.target.value })} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm" placeholder="Work email" />
-                <input type="tel" maxLength={40} value={contactDetails.phone} onChange={e => setContactDetails({ ...contactDetails, phone: e.target.value })} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm" placeholder="Phone (optional)" />
+                <input required maxLength={160} value={contactDetails.name} onChange={e => setContactDetails({ ...contactDetails, name: e.target.value })} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm" aria-label="Your name" placeholder="Your name" />
+                <input required maxLength={200} value={contactDetails.organizationName} onChange={e => setContactDetails({ ...contactDetails, organizationName: e.target.value })} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm" aria-label="Organization name" placeholder="Organization name" />
+                <input required type="email" maxLength={254} value={contactDetails.email} onChange={e => setContactDetails({ ...contactDetails, email: e.target.value })} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm" aria-label="Work email" placeholder="Work email" />
+                <input type="tel" maxLength={40} value={contactDetails.phone} onChange={e => setContactDetails({ ...contactDetails, phone: e.target.value })} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm" aria-label="Phone (optional)" placeholder="Phone (optional)" />
               </div>
               <div className="flex justify-between pt-2">
                 <div className="flex flex-wrap gap-2">
@@ -1197,7 +635,7 @@ function ProjectRequestWizard({ setSubPage }: { setSubPage: (p: 'home' | 'servic
           </div>
         )}
         {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{error}</p>}
-      </div>
+      </m.div>
     </div>
   );
 }
@@ -1246,20 +684,20 @@ function LoginScreen({ onLoginSuccess, showNotification }: { onLoginSuccess: (us
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-[#F6F8F7]">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-gray-200 p-8 space-y-8 animate-in fade-in">
+    <div className="login-scene min-h-[85vh] flex items-center justify-center px-4 py-12 bg-[#F6F8F7]"><div className="login-art" aria-hidden="true"><span>K / WORKSPACE</span><h1>Everything.<br />Working<br /><em>together.</em></h1><p>Clients. Projects. People.<br />Your operations, connected.</p><span className="login-art-mark">↗</span></div>
+      <div className="login-panel max-w-md w-full bg-white rounded-3xl shadow-xl border border-gray-200 p-8 space-y-8">
         <div className="text-center space-y-3">
           <div className="flex justify-center mb-2">
             <KobacLogo showText={false} darkText size="large" />
           </div>
-          <h2 className="text-2xl font-black text-[#0B3B2C]">Operations Portal Login</h2>
+          <h1 className="text-2xl font-black text-[#0B3B2C]">Operations Portal Login</h1>
           <p className="text-xs text-gray-500 font-medium">Secure Authentication for Kobac Systems Authorized Personnel</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Staff Email</label>
-            <input 
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-2" htmlFor="kobac-field-2">Staff Email</label>
+            <input id="kobac-field-2"
               type="email"
               required
               value={email}
@@ -1268,8 +706,8 @@ function LoginScreen({ onLoginSuccess, showNotification }: { onLoginSuccess: (us
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Password</label>
-            <input 
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-2" htmlFor="kobac-field-3">Password</label>
+            <input id="kobac-field-3"
               type="password"
               required
               value={password}
@@ -1343,7 +781,7 @@ function OperationsPortal({
   const currentTabLabel = tabs.find(t => t.id === activeTab)?.label || 'Dashboard';
 
   return (
-    <div className="min-h-screen bg-[#F6F8F7] flex flex-col md:flex-row relative">
+    <div className="operations-shell min-h-screen bg-[#F6F8F7] flex flex-col md:flex-row relative">
       {/* Mobile Top Bar */}
       <div className="md:hidden bg-[#0B3B2C] text-white px-4 py-3 flex items-center justify-between border-b border-[#144f3d] sticky top-0 z-40 shadow-md">
         <div className="flex items-center gap-3">
@@ -1351,6 +789,7 @@ function OperationsPortal({
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
             className="p-2 bg-[#144f3d] text-white rounded-xl focus:outline-none hover:bg-[#1b634e] transition-colors"
             aria-label="Toggle Navigation Drawer"
+            aria-expanded={mobileSidebarOpen}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {mobileSidebarOpen ? (
@@ -1389,6 +828,7 @@ function OperationsPortal({
               </div>
             </div>
             <button 
+              aria-label="Close workspace navigation"
               onClick={() => setMobileSidebarOpen(false)}
               className="md:hidden text-gray-300 hover:text-white p-1"
             >
@@ -1437,8 +877,8 @@ function OperationsPortal({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <main className="operations-content flex-1 p-4 md:p-8 overflow-y-auto">
+        <div className="max-w-7xl mx-auto space-y-8"><p className="workspace-breadcrumb">Workspace <span>/</span> {currentTabLabel}</p>
           {activeTab === 'overview' && <OverviewDashboard clients={clients} projects={projects} tasks={tasks} contracts={contracts} />}
           {activeTab === 'clients' && <ClientsModule clients={clients} users={users} onRefresh={onRefresh} showNotification={showNotification} />}
           {activeTab === 'documents' && <DocumentsModule documents={documents} onRefresh={onRefresh} showNotification={showNotification} />}
@@ -1653,37 +1093,37 @@ function ClientsModule({ clients, users, onRefresh, showNotification }: { client
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingClient ? 'Edit Client' : 'Add New Client'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Organization Name</label>
-                <input type="text" required value={formData.org_name} onChange={e => setFormData({ ...formData, org_name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-4">Organization Name</label>
+                <input id="kobac-field-4" type="text" required value={formData.org_name} onChange={e => setFormData({ ...formData, org_name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Contact Person</label>
-                  <input type="text" required value={formData.contact_person} onChange={e => setFormData({ ...formData, contact_person: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-5">Contact Person</label>
+                  <input id="kobac-field-5" type="text" required value={formData.contact_person} onChange={e => setFormData({ ...formData, contact_person: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Industry</label>
-                  <input type="text" required value={formData.industry} onChange={e => setFormData({ ...formData, industry: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Email</label>
-                  <input type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Phone</label>
-                  <input type="text" required value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-6">Industry</label>
+                  <input id="kobac-field-6" type="text" required value={formData.industry} onChange={e => setFormData({ ...formData, industry: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Location</label>
-                  <input type="text" required value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-7">Email</label>
+                  <input id="kobac-field-7" type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Status</label>
-                  <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-8">Phone</label>
+                  <input id="kobac-field-8" type="text" required value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-9">Location</label>
+                  <input id="kobac-field-9" type="text" required value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-10">Status</label>
+                  <select id="kobac-field-10" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
                     <option>Prospect</option>
                     <option>Active</option>
                     <option>Archived</option>
@@ -1691,8 +1131,8 @@ function ClientsModule({ clients, users, onRefresh, showNotification }: { client
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Requirements</label>
-                <textarea rows={3} value={formData.requirements} onChange={e => setFormData({ ...formData, requirements: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-11">Requirements</label>
+                <textarea id="kobac-field-11" rows={3} value={formData.requirements} onChange={e => setFormData({ ...formData, requirements: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 font-semibold text-sm">Cancel</button>
@@ -1813,17 +1253,17 @@ function DocumentsModule({ documents, onRefresh, showNotification }: { documents
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingDoc ? 'Edit Document' : 'Upload New Document'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Document Title</label>
-                <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-12">Document Title</label>
+                <input id="kobac-field-12" type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Reference Code</label>
-                  <input type="text" required value={formData.reference} onChange={e => setFormData({ ...formData, reference: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-13">Reference Code</label>
+                  <input id="kobac-field-13" type="text" required value={formData.reference} onChange={e => setFormData({ ...formData, reference: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Category</label>
-                  <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-14">Category</label>
+                  <select id="kobac-field-14" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
                     <option>Policy</option>
                     <option>Contract</option>
                     <option>Financial</option>
@@ -1833,12 +1273,12 @@ function DocumentsModule({ documents, onRefresh, showNotification }: { documents
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Department</label>
-                  <input type="text" required value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-15">Department</label>
+                  <input id="kobac-field-15" type="text" required value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Confidentiality</label>
-                  <select value={formData.confidentiality} onChange={e => setFormData({ ...formData, confidentiality: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-16">Confidentiality</label>
+                  <select id="kobac-field-16" value={formData.confidentiality} onChange={e => setFormData({ ...formData, confidentiality: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
                     <option>Internal</option>
                     <option>Confidential</option>
                     <option>Restricted</option>
@@ -1846,8 +1286,8 @@ function DocumentsModule({ documents, onRefresh, showNotification }: { documents
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Description</label>
-                <textarea rows={3} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-17">Description</label>
+                <textarea id="kobac-field-17" rows={3} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 font-semibold text-sm">Cancel</button>
@@ -1962,22 +1402,22 @@ function NegotiationsModule({ negotiations, onRefresh, showNotification }: { neg
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingNeg ? 'Edit Negotiation' : 'Add New Negotiation'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Title</label>
-                <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-18">Title</label>
+                <input id="kobac-field-18" type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Client</label>
-                  <input type="text" required value={formData.client} onChange={e => setFormData({ ...formData, client: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-19">Client</label>
+                  <input id="kobac-field-19" type="text" required value={formData.client} onChange={e => setFormData({ ...formData, client: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Opportunity</label>
-                  <input type="text" required value={formData.opportunity} onChange={e => setFormData({ ...formData, opportunity: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-20">Opportunity</label>
+                  <input id="kobac-field-20" type="text" required value={formData.opportunity} onChange={e => setFormData({ ...formData, opportunity: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Client Requirements</label>
-                <textarea rows={3} value={formData.client_requirements} onChange={e => setFormData({ ...formData, client_requirements: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-21">Client Requirements</label>
+                <textarea id="kobac-field-21" rows={3} value={formData.client_requirements} onChange={e => setFormData({ ...formData, client_requirements: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 font-semibold text-sm">Cancel</button>
@@ -2081,22 +1521,22 @@ function ProjectsModule({ projects, users, onRefresh, showNotification }: { proj
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingProj ? 'Edit Project' : 'Add New Project'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Project Name</label>
-                <input type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-22">Project Name</label>
+                <input id="kobac-field-22" type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Client</label>
-                  <input type="text" required value={formData.client} onChange={e => setFormData({ ...formData, client: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-23">Client</label>
+                  <input id="kobac-field-23" type="text" required value={formData.client} onChange={e => setFormData({ ...formData, client: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Budget</label>
-                  <input type="text" required value={formData.budget} onChange={e => setFormData({ ...formData, budget: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-24">Budget</label>
+                  <input id="kobac-field-24" type="text" required value={formData.budget} onChange={e => setFormData({ ...formData, budget: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Scope</label>
-                <textarea rows={3} value={formData.scope} onChange={e => setFormData({ ...formData, scope: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-25">Scope</label>
+                <textarea id="kobac-field-25" rows={3} value={formData.scope} onChange={e => setFormData({ ...formData, scope: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 font-semibold text-sm">Cancel</button>
@@ -2210,17 +1650,17 @@ function TasksModule({ tasks, users, onRefresh, showNotification }: { tasks: Tas
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingTask ? 'Edit Task' : 'Add New Task'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Task Title</label>
-                <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-26">Task Title</label>
+                <input id="kobac-field-26" type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Assigned To</label>
-                  <input type="text" required value={formData.assigned_to} onChange={e => setFormData({ ...formData, assigned_to: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-27">Assigned To</label>
+                  <input id="kobac-field-27" type="text" required value={formData.assigned_to} onChange={e => setFormData({ ...formData, assigned_to: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Priority</label>
-                  <select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-28">Priority</label>
+                  <select id="kobac-field-28" value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
                     <option>Low</option>
                     <option>Medium</option>
                     <option>High</option>
@@ -2228,8 +1668,8 @@ function TasksModule({ tasks, users, onRefresh, showNotification }: { tasks: Tas
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Description</label>
-                <textarea rows={3} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-29">Description</label>
+                <textarea id="kobac-field-29" rows={3} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 font-semibold text-sm">Cancel</button>
@@ -2361,21 +1801,21 @@ function CommunicationsModule({ users, onRefresh, setActiveTab, showNotification
               </div>
               <div className="space-y-3 rounded-xl bg-gray-50 p-4">
                 <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-gray-500">Request Status</label>
-                  <select value={s.status} onChange={e => setSubmissions(current => current.map(item => item.id === s.id ? { ...item, status: e.target.value } : item))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" disabled={s.status === 'Converted' || s.status === 'Converting'}>
+                  <label className="mb-1 block text-xs font-bold uppercase text-gray-500" htmlFor="kobac-field-30">Request Status</label>
+                  <select id="kobac-field-30" value={s.status} onChange={e => setSubmissions(current => current.map(item => item.id === s.id ? { ...item, status: e.target.value } : item))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" disabled={s.status === 'Converted' || s.status === 'Converting'}>
                     {['New', 'In Review', 'Accepted', 'Declined', 'Unread', 'Converted', 'Converting'].map(status => <option key={status}>{status}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-gray-500">Assigned Staff</label>
-                  <select value={s.assigned_staff_id || ''} onChange={e => setSubmissions(current => current.map(item => item.id === s.id ? { ...item, assigned_staff_id: e.target.value || null } : item))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                  <label className="mb-1 block text-xs font-bold uppercase text-gray-500" htmlFor="kobac-field-31">Assigned Staff</label>
+                  <select id="kobac-field-31" value={s.assigned_staff_id || ''} onChange={e => setSubmissions(current => current.map(item => item.id === s.id ? { ...item, assigned_staff_id: e.target.value || null } : item))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
                     <option value="">Unassigned</option>
                     {users.filter(user => user.active).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-gray-500">Internal Notes</label>
-                  <textarea rows={3} maxLength={5000} value={s.internal_notes || ''} onChange={e => setSubmissions(current => current.map(item => item.id === s.id ? { ...item, internal_notes: e.target.value } : item))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Staff-only follow-up notes" />
+                  <label className="mb-1 block text-xs font-bold uppercase text-gray-500" htmlFor="kobac-field-32">Internal Notes</label>
+                  <textarea id="kobac-field-32" rows={3} maxLength={5000} value={s.internal_notes || ''} onChange={e => setSubmissions(current => current.map(item => item.id === s.id ? { ...item, internal_notes: e.target.value } : item))} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Staff-only follow-up notes" />
                 </div>
                 <button onClick={() => handleUpdate(s)} className="rounded-lg bg-[#0B3B2C] px-4 py-2 text-sm font-bold text-white">Save Updates</button>
               </div>
@@ -2896,22 +2336,22 @@ function BoardModule({ boardMembers, onRefresh, showNotification }: { boardMembe
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingBoard ? 'Edit Board Member' : 'Add Board Member'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Full Name</label>
-                <input type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-33">Full Name</label>
+                <input id="kobac-field-33" type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Position / Title</label>
-                  <input type="text" required value={formData.position} onChange={e => setFormData({ ...formData, position: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-34">Position / Title</label>
+                  <input id="kobac-field-34" type="text" required value={formData.position} onChange={e => setFormData({ ...formData, position: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Contact Email</label>
-                  <input type="email" required value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-35">Contact Email</label>
+                  <input id="kobac-field-35" type="email" required value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Bio / Background</label>
-                <textarea rows={3} value={formData.bio} onChange={e => setFormData({ ...formData, bio: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-36">Bio / Background</label>
+                <textarea id="kobac-field-36" rows={3} value={formData.bio} onChange={e => setFormData({ ...formData, bio: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 font-semibold text-sm">Cancel</button>
@@ -3032,27 +2472,27 @@ function ContractsModule({ contracts, clients, onRefresh, showNotification }: { 
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingContract ? 'Edit Contract' : 'Add New Contract'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Contract Title</label>
-                <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-37">Contract Title</label>
+                <input id="kobac-field-37" type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Client Name</label>
-                  <input type="text" required value={formData.client} onChange={e => setFormData({ ...formData, client: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-38">Client Name</label>
+                  <input id="kobac-field-38" type="text" required value={formData.client} onChange={e => setFormData({ ...formData, client: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Contract Value</label>
-                  <input type="text" required value={formData.value} onChange={e => setFormData({ ...formData, value: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-39">Contract Value</label>
+                  <input id="kobac-field-39" type="text" required value={formData.value} onChange={e => setFormData({ ...formData, value: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Start Date</label>
-                  <input type="date" required value={formData.start_date} onChange={e => setFormData({ ...formData, start_date: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-40">Start Date</label>
+                  <input id="kobac-field-40" type="date" required value={formData.start_date} onChange={e => setFormData({ ...formData, start_date: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Expiration Date</label>
-                  <input type="date" required value={formData.expiration_date} onChange={e => setFormData({ ...formData, expiration_date: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-41">Expiration Date</label>
+                  <input id="kobac-field-41" type="date" required value={formData.expiration_date} onChange={e => setFormData({ ...formData, expiration_date: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-4">
@@ -3154,22 +2594,22 @@ function MeetingsModule({ meetings, onRefresh, showNotification }: { meetings: M
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingMeeting ? 'Edit Meeting' : 'Schedule Meeting'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Subject</label>
-                <input type="text" required value={formData.subject} onChange={e => setFormData({ ...formData, subject: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-42">Subject</label>
+                <input id="kobac-field-42" type="text" required value={formData.subject} onChange={e => setFormData({ ...formData, subject: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Channel</label>
-                  <input type="text" required value={formData.channel} onChange={e => setFormData({ ...formData, channel: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-43">Channel</label>
+                  <input id="kobac-field-43" type="text" required value={formData.channel} onChange={e => setFormData({ ...formData, channel: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Date & Time</label>
-                  <input type="text" required value={formData.date_time} onChange={e => setFormData({ ...formData, date_time: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-44">Date & Time</label>
+                  <input id="kobac-field-44" type="text" required value={formData.date_time} onChange={e => setFormData({ ...formData, date_time: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Summary / Minutes</label>
-                <textarea rows={3} value={formData.summary} onChange={e => setFormData({ ...formData, summary: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-45">Summary / Minutes</label>
+                <textarea id="kobac-field-45" rows={3} value={formData.summary} onChange={e => setFormData({ ...formData, summary: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 font-semibold text-sm">Cancel</button>
@@ -3281,17 +2721,17 @@ function RemindersModule({ reminders, onRefresh, showNotification }: { reminders
             <h3 className="text-2xl font-bold text-[#0B3B2C]">{editingRem ? 'Edit Reminder' : 'Add Reminder'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Reminder Title</label>
-                <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-46">Reminder Title</label>
+                <input id="kobac-field-46" type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Due Date</label>
-                  <input type="date" required value={formData.due_date} onChange={e => setFormData({ ...formData, due_date: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-47">Due Date</label>
+                  <input id="kobac-field-47" type="date" required value={formData.due_date} onChange={e => setFormData({ ...formData, due_date: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Priority</label>
-                  <select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-48">Priority</label>
+                  <select id="kobac-field-48" value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm">
                     <option>Low</option>
                     <option>Medium</option>
                     <option>High</option>
@@ -3454,22 +2894,22 @@ function TeamModule({ users, onRefresh, showNotification }: { users: User[]; onR
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Full Name</label>
-                  <input type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-49">Full Name</label>
+                  <input id="kobac-field-49" type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Job Title</label>
-                  <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-50">Job Title</label>
+                  <input id="kobac-field-50" type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Department</label>
-                  <input type="text" required value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-51">Department</label>
+                  <input id="kobac-field-51" type="text" required value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">System Role</label>
-                  <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-bold text-[#0B3B2C]">
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-52">System Role</label>
+                  <select id="kobac-field-52" value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-bold text-[#0B3B2C]">
                     <option>CEO / Executive</option>
                     <option>Digital Strategy Lead</option>
                     <option>Operations Lead</option>
@@ -3479,21 +2919,21 @@ function TeamModule({ users, onRefresh, showNotification }: { users: User[]; onR
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Email</label>
-                  <input type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-53">Email</label>
+                  <input id="kobac-field-53" type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Phone</label>
-                  <input type="text" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-54">Phone</label>
+                  <input id="kobac-field-54" type="text" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">{editingUser ? 'New Password (leave blank to keep current)' : 'Initial Password'}</label>
-                <input type="password" autoComplete="new-password" required={!editingUser} minLength={12} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-55">{editingUser ? 'New Password (leave blank to keep current)' : 'Initial Password'}</label>
+                <input id="kobac-field-55" type="password" autoComplete="new-password" required={!editingUser} minLength={12} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Responsibilities</label>
-                <textarea rows={2} value={formData.responsibilities} onChange={e => setFormData({ ...formData, responsibilities: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-56">Responsibilities</label>
+                <textarea id="kobac-field-56" rows={2} value={formData.responsibilities} onChange={e => setFormData({ ...formData, responsibilities: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <input type="checkbox" id="activeToggle" checked={formData.active} onChange={e => setFormData({ ...formData, active: e.target.checked })} className="w-4 h-4 rounded text-[#0B3B2C]" />
@@ -3617,40 +3057,40 @@ function SettingsModule({ companySettings, onRefresh, showNotification }: { comp
       <form onSubmit={handleSubmit} className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm space-y-6">
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Company Name</label>
-            <input type="text" value={formData.company_name} onChange={e => setFormData({ ...formData, company_name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-57">Company Name</label>
+            <input id="kobac-field-57" type="text" value={formData.company_name} onChange={e => setFormData({ ...formData, company_name: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Tagline</label>
-            <input type="text" value={formData.tagline} onChange={e => setFormData({ ...formData, tagline: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-58">Tagline</label>
+            <input id="kobac-field-58" type="text" value={formData.tagline} onChange={e => setFormData({ ...formData, tagline: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Email</label>
-            <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-59">Email</label>
+            <input id="kobac-field-59" type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Phone numbers (comma separated)</label>
-            <input type="text" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-60">Phone numbers (comma separated)</label>
+            <input id="kobac-field-60" type="text" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
           </div>
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Location</label>
-          <input type="text" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+          <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-61">Location</label>
+          <input id="kobac-field-61" type="text" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Logo URL (optional)</label>
-          <input type="url" value={formData.logo_url} onChange={e => setFormData({ ...formData, logo_url: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
+          <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-62">Logo URL (optional)</label>
+          <input id="kobac-field-62" type="url" value={formData.logo_url} onChange={e => setFormData({ ...formData, logo_url: e.target.value })} className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-sm" />
         </div>
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Primary color</label>
-            <input type="color" value={formData.primary_color} onChange={e => setFormData({ ...formData, primary_color: e.target.value })} className="w-full h-11 bg-gray-50 border border-gray-300 rounded-xl px-2" />
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-63">Primary color</label>
+            <input id="kobac-field-63" type="color" value={formData.primary_color} onChange={e => setFormData({ ...formData, primary_color: e.target.value })} className="w-full h-11 bg-gray-50 border border-gray-300 rounded-xl px-2" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Accent color</label>
-            <input type="color" value={formData.accent_color} onChange={e => setFormData({ ...formData, accent_color: e.target.value })} className="w-full h-11 bg-gray-50 border border-gray-300 rounded-xl px-2" />
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1" htmlFor="kobac-field-64">Accent color</label>
+            <input id="kobac-field-64" type="color" value={formData.accent_color} onChange={e => setFormData({ ...formData, accent_color: e.target.value })} className="w-full h-11 bg-gray-50 border border-gray-300 rounded-xl px-2" />
           </div>
         </div>
         <button type="submit" className="bg-[#0B3B2C] hover:bg-[#144f3d] text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md">
@@ -3666,17 +3106,11 @@ function SettingsModule({ companySettings, onRefresh, showNotification }: { comp
 // ==========================================
 
 function AiChatAssistant() {
-  const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'assistant', text: 'Mahadsanid! Soo dhowow. Anigu waa Caawinta AI ee Kobac Systems. Sidee baan ku caawin karaa maanta? (Welcome! How can I help you today?)' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isOpen]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3704,80 +3138,6 @@ function AiChatAssistant() {
     }
   };
 
-  return (
-    <div className="fixed bottom-6 right-6 z-50">
-      {!isOpen ? (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="bg-[#0B3B2C] hover:bg-[#144f3d] text-white p-4 rounded-full shadow-2xl flex items-center gap-3 border-2 border-[#F5A623] transition-all transform hover:scale-105 group"
-        >
-          <div className="w-8 h-8 rounded-full bg-[#F5A623] text-[#0B3B2C] flex items-center justify-center font-bold text-base shadow">
-            🤖
-          </div>
-          <div className="text-left pr-2">
-            <p className="text-xs font-bold text-[#F5A623] uppercase tracking-wider">Caawinta AI</p>
-            <p className="text-xs font-medium text-white">ku dhufo caawinta AI ga</p>
-          </div>
-        </button>
-      ) : (
-        <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 w-96 max-w-[calc(100vw-2rem)] flex flex-col h-[520px] overflow-hidden animate-in fade-in slide-in-from-bottom-6">
-          {/* Header */}
-          <div className="bg-[#0B3B2C] text-white p-4 flex items-center justify-between border-b border-[#144f3d]">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-[#F5A623] text-[#0B3B2C] flex items-center justify-center font-bold text-lg shadow">
-                🤖
-              </div>
-              <div>
-                <h3 className="font-bold text-sm">Caawinta AI ee Kobac</h3>
-                <p className="text-[11px] text-emerald-300">Gemini 2.5 Flash • Somali & English</p>
-              </div>
-            </div>
-            <button onClick={() => setIsOpen(false)} className="text-gray-300 hover:text-white font-bold text-lg p-1">
-              &times;
-            </button>
-          </div>
 
-          {/* Messages */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F6F8F7]">
-            {messages.map((m, idx) => (
-              <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-3.5 rounded-2xl text-xs leading-relaxed ${
-                  m.role === 'user' ? 'bg-[#0B3B2C] text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
-                }`}>
-                  {m.text}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-white p-3 rounded-2xl border border-gray-200 text-xs text-gray-500 animate-pulse shadow-sm">
-                  AI waa uu qorayaa...
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <form onSubmit={handleSend} className="p-3 bg-white border-t border-gray-200 flex items-center gap-2">
-            <input
-              type="text"
-              maxLength={4000}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="Weydii su'aal (Ask a question)..."
-              className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#0B3B2C]"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-[#0B3B2C] hover:bg-[#144f3d] text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-md"
-            >
-              Dir
-            </button>
-          </form>
-        </div>
-      )}
-    </div>
-  );
+  return <KobacCompanion messages={messages} input={input} loading={loading} onInput={setInput} onSend={handleSend} />;
 }

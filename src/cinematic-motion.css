@@ -1,0 +1,110 @@
+/* One motion language: assemble, carry momentum, settle. Native document scrolling. */
+.kinetic-word-mask {
+  display: inline-block;
+  overflow: clip;
+  vertical-align: bottom;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+  perspective: 600px;
+}
+.kinetic-word-mask > span {
+  display: inline-block;
+  transform-origin: 50% 100%;
+}
+.technology-site .core-orbits {
+  animation-duration: 20s;
+}
+.technology-site .core-tracer {
+  animation-duration: 9s;
+}
+.technology-site .core-pulse {
+  animation-duration: 3s;
+}
+.system-core::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 45%, #9dc5a412 50%, transparent 55%);
+  translate: 0 -100%;
+  pointer-events: none;
+  animation: core-scan 5s linear infinite;
+  animation-play-state: paused;
+}
+.system-core.is-running::after {
+  animation-play-state: running;
+}
+.core-node {
+  animation: node-drift 5s ease-in-out infinite;
+  animation-play-state: paused;
+}
+.core-node--two {
+  animation-delay: -1.7s;
+}
+.core-node--three {
+  animation-delay: -3.3s;
+}
+.system-core.is-running .core-node {
+  animation-play-state: running;
+}
+@keyframes core-scan {
+  to {
+    translate: 0 100%;
+  }
+}
+@keyframes node-drift {
+  50% {
+    translate: 0 -8px;
+  }
+}
+.project-grid {
+  perspective: 1200px;
+}
+.project-card {
+  transform-origin: center top;
+}
+.chapter-ghost {
+  position: absolute;
+  right: 0;
+  top: 20px;
+  font-size: 150px;
+  line-height: 0.9;
+  letter-spacing: -0.08em;
+  color: transparent;
+  -webkit-text-stroke: 1px #91b39a18;
+  pointer-events: none;
+  z-index: -1;
+}
+.process-chapter {
+  position: relative;
+  isolation: isolate;
+}
+.footer-letter {
+  display: inline-block;
+  transform-origin: center bottom;
+}
+.footer-brand-word {
+  perspective: 900px;
+}
+@media (max-width: 600px) {
+  .chapter-ghost {
+    font-size: 110px;
+  }
+}
+.motion-paused :is(.core-node, .system-core::after) {
+  animation: none !important;
+}
+.motion-paused :is(.kinetic-word-mask > span, .footer-letter) {
+  transform: none !important;
+  opacity: 1 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .core-node,
+  .system-core::after {
+    animation: none !important;
+  }
+  .kinetic-word-mask > span,
+  .footer-letter {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

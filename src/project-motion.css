@@ -1,0 +1,385 @@
+/* Additive motion and project presentation. The approved visual identity stays in technology.css. */
+.technology-site .motion-control {
+  transition:
+    color 180ms,
+    background 180ms,
+    border-color 180ms;
+}
+.technology-site .hero-copy {
+  translate: 0 calc(var(--hero-travel, 0) * -0.25px);
+}
+.technology-site .hero-art-wrap {
+  translate: 0 calc(var(--hero-travel, 0) * 0.4px);
+}
+.technology-site .scroll-words {
+  display: inline;
+}
+.technology-site .scroll-words > span[aria-hidden] {
+  white-space: normal;
+}
+.project-showcase {
+  scroll-margin-top: 110px;
+}
+.project-collection-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 0;
+  margin-bottom: 25px;
+  border-top: 1px solid var(--line);
+  font: 9px/1.7 var(--technical-font);
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+  color: var(--ink-secondary);
+}
+.project-collection-meta > span:last-child {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 65px 32px;
+}
+.project-card {
+  min-width: 0;
+  perspective: 1200px;
+}
+.project-plane {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  background: #14231a;
+  transition: border-color 250ms;
+}
+.project-card:hover .project-plane,
+.project-card:focus-within .project-plane {
+  border-color: #8eb49a99;
+}
+.project-frame-top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 13px 16px;
+  font: 8px/1 var(--technical-font);
+  color: #afc0b1;
+  background: #112017;
+  min-width: 0;
+}
+.project-frame-top > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-frame-top > span:first-child {
+  display: flex;
+  gap: 5px;
+}
+.project-frame-top i {
+  width: 4px;
+  height: 4px;
+  background: #5f7967;
+  border-radius: 50%;
+}
+.project-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16/9;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.project-image-reveal {
+  width: 100%;
+  overflow: hidden;
+}
+.project-image-reveal img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.project-preview-cue {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 5px;
+  border: 1px solid #9aba9c99;
+  background: #122519;
+  color: #f5c470;
+  opacity: 0;
+  transform: translate(-5px, 5px);
+  transition:
+    opacity 200ms,
+    transform 350ms var(--ease);
+}
+.project-preview:hover .project-preview-cue,
+.project-preview:focus-visible .project-preview-cue {
+  opacity: 1;
+  transform: none;
+}
+.project-caption {
+  padding: 24px 0 0;
+}
+.project-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  font: 8px/1.6 var(--technical-font);
+  color: var(--ink-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.project-meta > span:last-child {
+  text-align: right;
+}
+.technology-site .project-caption h3 {
+  font-size: clamp(28px, 3vw, 43px);
+  margin-top: 15px;
+  font-weight: 500;
+}
+.technology-site .project-caption > p {
+  font-size: 12px;
+  line-height: 1.85;
+  margin-top: 16px;
+  color: var(--ink-secondary);
+  max-width: 490px;
+}
+.project-tags {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  gap: 8px 16px;
+  font: 8px/1.6 var(--technical-font);
+  color: #b0c4b4;
+}
+.project-tags li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.project-tags li::before {
+  content: "";
+  width: 3px;
+  height: 3px;
+  background: #b58b4f;
+}
+.project-destinations {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  border-bottom: 1px solid var(--line);
+  margin-top: 22px;
+  padding-bottom: 15px;
+}
+.project-destinations a {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 44px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.project-destinations .project-demo {
+  color: #e6eee1;
+  transition: color 180ms;
+}
+.project-demo:hover {
+  color: var(--accent) !important;
+}
+.project-destinations .project-source {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--ink-secondary);
+  gap: 8px;
+}
+.project-source:hover {
+  color: var(--accent);
+}
+.project-access {
+  display: block;
+  font: 8px/1.6 var(--technical-font);
+  color: var(--ink-secondary);
+  margin-top: 12px;
+}
+.project-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 35px;
+  margin: -5px 0 45px;
+}
+.project-filters > button {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 15px 0;
+  font-size: 11px;
+  color: var(--ink-secondary);
+  min-height: 44px;
+}
+.project-filters > button[aria-pressed="true"] {
+  color: var(--ink);
+}
+.project-filters > button > span {
+  position: absolute;
+  bottom: 0;
+  inset-inline: 0;
+  height: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 350ms var(--ease);
+}
+.project-filters > button[aria-pressed="true"] > span {
+  transform: scaleX(1);
+}
+.published-case-studies {
+  margin-top: var(--section-space);
+}
+.published-case-studies > .eyebrow {
+  margin-bottom: 35px;
+}
+.kobac-app:has(.technology-site) .ai-assistant > div {
+  animation: assistant-enter 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom right;
+}
+@keyframes assistant-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.kobac-app:has(.motion-paused) .ai-assistant > div {
+  animation: none !important;
+}
+@media (max-width: 850px) {
+  .project-grid {
+    gap: 50px 25px;
+  }
+  .technology-site .project-caption h3 {
+    font-size: 29px;
+  }
+  .project-frame-top {
+    padding: 12px;
+    gap: 12px;
+  }
+  .project-meta {
+    flex-direction: column;
+    gap: 5px;
+  }
+  .project-meta > span:last-child {
+    text-align: left;
+    font-size: 7px;
+  }
+}
+@media (max-width: 600px) {
+  .technology-site .hero-copy,
+  .technology-site .hero-art-wrap {
+    translate: none;
+  }
+  .project-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 48px;
+  }
+  .project-collection-meta {
+    font-size: 7px;
+    gap: 25px;
+    align-items: start;
+  }
+  .project-collection-meta > span:first-child {
+    max-width: 170px;
+  }
+  .project-caption {
+    padding-top: 20px;
+  }
+  .project-destinations {
+    justify-content: flex-start;
+    gap: 35px;
+  }
+  .project-meta {
+    flex-direction: row;
+  }
+  .project-meta > span:last-child {
+    text-align: right;
+  }
+  .technology-site .project-caption h3 {
+    font-size: 31px;
+  }
+  .project-filters {
+    gap: 0 22px;
+    margin-bottom: 35px;
+  }
+  .project-filters > button {
+    font-size: 10px;
+  }
+  .project-preview-cue {
+    opacity: 1;
+    transform: none;
+    width: 32px;
+    height: 32px;
+    right: 12px;
+    bottom: 12px;
+  }
+  .project-preview-cue svg {
+    width: 18px;
+  }
+  .project-card {
+    perspective: none;
+  }
+  .project-plane {
+    transform: none !important;
+  }
+  .project-image-reveal img {
+    transform: none !important;
+  }
+}
+@media (pointer: coarse) {
+  .project-plane,
+  .project-image-reveal img {
+    transform: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .technology-site .hero-copy,
+  .technology-site .hero-art-wrap {
+    translate: none !important;
+  }
+  .project-image-reveal {
+    clip-path: none !important;
+    opacity: 1 !important;
+  }
+  .project-plane,
+  .project-image-reveal img {
+    transform: none !important;
+  }
+}
+.motion-paused .hero-copy,
+.motion-paused .hero-art-wrap {
+  translate: none !important;
+}
+.motion-paused .project-image-reveal {
+  clip-path: none !important;
+  opacity: 1 !important;
+}
+.motion-paused .project-plane,
+.motion-paused .project-image-reveal img {
+  transform: none !important;
+}
+.motion-paused .motion-control {
+  transform: none !important;
+}

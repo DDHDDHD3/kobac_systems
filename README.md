@@ -1,38 +1,137 @@
 <div align="center">
 
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="public/kobac-logo.png" />
+<img src="public/kobac-logo-dark.png" width="240" alt="KOBAC Systems" />
+</picture>
 
-## Run Locally
+# Technology that moves you forward.
 
-**Prerequisites:** Node.js and pnpm
+**frontend design · v1.2**
 
+Digital solutions. Connected operations. A little personality.
 
-1. Install dependencies:
-   `pnpm install`
-2. Create a local `.env` file beside `server.ts` (on PowerShell: `Copy-Item .env.example .env`).
-3. Replace the `DATABASE_URL` example value with your Neon PostgreSQL connection string from the Neon dashboard. It must start with `postgresql://`. Do not share this URL or commit `.env`.
-4. Optionally set `GEMINI_API_KEY` in the server-side `.env` file. Keep this key out of client-side `VITE_` variables and out of source control.
-5. Optionally set unique `KOBAC_CEO_PASSWORD`, `KOBAC_CDSO_PASSWORD`, and `KOBAC_OPS_PASSWORD` values in `.env` to provision or update those initial staff accounts. Never commit real passwords.
-6. Run the app on port 3000:
-   `pnpm dev`
+[![Version](https://img.shields.io/badge/release-v1.2-F5A623?style=flat-square&labelColor=0B3B2C)](https://github.com/DDHDDHD3/kobac_systems/releases/tag/v1.2)
+![React](https://img.shields.io/badge/React-19-0B3B2C?style=flat-square)
+![TypeScript](https://img.shields.io/badge/TypeScript-7-0B3B2C?style=flat-square)
+![Motion](https://img.shields.io/badge/Motion-12-0B3B2C?style=flat-square)
 
-If `DATABASE_URL` is missing or still contains the example placeholders, the website shell still starts on port 3000, but database-backed API routes return HTTP 503 until a real connection string is configured. Check the configuration status at `http://localhost:3000/api/health`.
+[Explore the website](https://kobacsystems.vercel.app/) · [What's new](CHANGELOG.md) · [Release & verification](docs/releases/v1.2.md) · [Contributing](CONTRIBUTING.md)
 
-## Deploy to Vercel
+<a href="https://kobacsystems.vercel.app/"><img src="docs/assets/frontend-motion.gif" width="960" alt="KOBAC homepage and project posters moving into a connected grid as the page scrolls" /></a>
 
-Import `DDHDDHD3/kobac-systems` as a Vercel project with the repository root as the project root. The included Vercel configuration builds the Vite frontend, routes API requests to serverless functions, and forwards them to the Express app.
+<sub>Captured from the local v1.2 frontend. Time-condensed scroll preview; <a href="docs/assets/frontend-hero.webp">static alternative</a>. GitHub's animated image does not inherit your device's reduced-motion setting.</sub>
 
-Set `DATABASE_URL` in the Vercel project's Environment Variables for Production and Preview deployments. Set `GEMINI_API_KEY` if the AI features should be enabled. Existing staff accounts keep their database passwords unless the optional `KOBAC_CEO_PASSWORD`, `KOBAC_CDSO_PASSWORD`, or `KOBAC_OPS_PASSWORD` variables are configured. Never put credentials in `VITE_` variables, commit them, or paste deployment tokens into chat. After changing environment variables, redeploy the project.
+</div>
 
-## Shared Application Data
+## Built around the way you work
 
-Neon PostgreSQL is the source of truth for the Operations Portal and public website. The staff dashboard loads its CRM, projects, documents, contracts, reports, team, company settings, inquiries, and case studies from authenticated APIs. The public website reads published case studies, active team profiles, company contact details, and branding from the public bootstrap API. Staff can create, edit, publish, unpublish, and delete case studies in the dashboard's **Public Website Content** section; drafts are not returned by the public API. Saving dashboard changes refreshes both dashboard and public website data. Public endpoints are limited to website inquiries, project scoping, AI chat, and published website data.
+KOBAC Systems is an IT and digital transformation company in Mogadishu, Somalia. This repository contains its public website and staff Operations Portal, with an Express API and Neon PostgreSQL data layer.
 
-The public AI assistant uses the company settings and published case studies from the database as its context. Private dashboard records are not supplied to the public AI assistant. If Gemini is unavailable or not configured, the chat returns an explicit service error rather than a simulated AI answer.
+**v1.2 is a frontend design release.** It updates the public experience while preserving the existing server, database schema, authentication, API contracts, staff workflows, inquiry forms, and AI integrations.
 
-## Reports & Presentations
+| Experience | What changed |
+| --- | --- |
+| Brand in motion | Forest green and amber from the actual logo, local variable Manrope, editorial typography, and a sculptural three-leaf hero. |
+| Connected by design | Project posters travel from scattered positions into a measured grid, driven by native scroll progress and captured layouts. |
+| Work, on a bigger stage | Full-width project scenes, image depth, direct demo/source links, and a filterable seven-project collection. |
+| Meet Kobi | An original leaf-eared companion with tracking eyes, expressive poses, dragging, keyboard movement, roaming, and fetch play. Click Kobi to open the minimal AI chat. |
+| A calmer option | A visible **Reduce motion** control and system preference support. Simplified layouts preserve content and actions. |
 
-Signed-in staff can create, edit, and delete reports in the Operations Portal. Report records are stored in Neon and included in authenticated dashboard data. PDF-ready print views and CSV downloads use the latest available project, client, contract, and audit data.
+<details>
+<summary><strong>Meet Kobi — desktop and mobile previews</strong></summary>
 
-## AI Project Scoping
+<p>
+<img src="docs/assets/kobi-desktop.webp" width="700" alt="Kobi beside its minimal desktop chat panel" />
+<img src="docs/assets/kobi-mobile.webp" width="240" alt="Kobi perched above the mobile chat panel" />
+</p>
 
-The public AI Project Scoping Wizard uses `GEMINI_API_KEY` on the server to create a recommendation from the selected service, organization type, and submitted business challenge. Project inquiries are stored with their recommendation in the existing Communications & Inquiries workflow. Signed-in staff can review, assign, and update requests there; accepted requests can be converted into client and project records.
+Drag Kobi, use the arrow keys while focused, or press Enter to chat. Escape closes the panel. Fetch invites play; reduced motion keeps the companion still. AI responses depend on the existing server configuration—there are no simulated answers.
+
+</details>
+
+## Project collection
+
+These are collaborator-supplied repository projects, not invented KOBAC client engagements. Artwork and screenshots are labelled in the interface; [asset provenance](public/projects/SOURCES.md) records the sources.
+
+| Project | Demo | Repository |
+| --- | --- | --- |
+| Uncanny Stranger | [Photography portfolio](https://uncannystranger.com/) | [Source](https://github.com/uncannystranger/uncannystranger) |
+| Digital Invoice | [Frontend demo · sign-in](https://digital-invoice-inky.vercel.app/) | [Source](https://github.com/uncannystranger/digital_invoice) |
+| Xaadir | [Attendance prototype · sign-in](https://xaadir.vercel.app/) | [Source](https://github.com/uncannystranger/xaadir) |
+| Sahafi Rent Book | [Credit ledger](https://sahafi-restuarant.vercel.app/) | [Source](https://github.com/uncannystranger/sahafi-restuarant) |
+| Diiwaan | [Queue management](https://diiwaan-so.vercel.app/) | [Source](https://github.com/uncannystranger/diiwaan.so) |
+| Gurey Group | [Retail workspace · sign-in](https://gureygroup.vercel.app/) | [Source](https://github.com/uncannystranger/gureygroup) |
+| Sentinel | [Cyber intelligence dashboard](https://uncannystranger.github.io/Cyber-Threat-Live-Dashboard/) | [Source](https://github.com/uncannystranger/Cyber-Threat-Live-Dashboard) |
+
+Demo pages responded with HTTP 200 on 19 October 2026. This checks availability, not sign-in or transactions.
+
+## Run locally
+
+Use **Node.js 24** and **pnpm 9** (verified with Node 24.11.0 and pnpm 9.15.5).
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Open **http://localhost:3000/**. Without a configured database, the public shell and motion can be previewed; database-backed requests return HTTP 503. Kobi shows an unavailable-service message instead of a fabricated response.
+
+For full-stack development, copy `.env.example` to `.env` beside `server.ts` and use a **development** Neon database. The existing server initializes application tables at startup. On PowerShell: `Copy-Item .env.example .env`.
+
+| Server variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Neon PostgreSQL connection string beginning with `postgresql://`. Required for database-backed features. |
+| `GEMINI_API_KEY` | Optional server-side Gemini key for AI chat and project scoping. |
+| `KOBAC_CEO_PASSWORD`, `KOBAC_CDSO_PASSWORD`, `KOBAC_OPS_PASSWORD` | Optional values used by the existing staff-account provisioning workflow. |
+
+Keep credentials out of source control and client-side `VITE_` variables. See `/api/health` for configuration status. Use development data for local testing.
+
+```sh
+pnpm lint       # TypeScript check (tsc --noEmit)
+pnpm build      # Production frontend build
+pnpm preview    # Static build preview; does not start the Express API
+```
+
+## Code map
+
+```text
+src/components/PublicWebsite.tsx     Public views, navigation and contact form
+src/components/StudioExperience.tsx  Hero sculpture, connected gallery, work scenes
+src/components/KobacCompanion.tsx     Character, play controls and chat presentation
+src/components/TechnologyMotion.tsx  Shared motion controls and primitives
+src/components/ProjectShowcase.tsx   Project collection and filters
+src/data/projectCatalog.ts          Project descriptions and real demo URLs
+src/studio.css · src/companion.css   Studio composition, character and chat
+src/App.tsx                         Application state, staff portal, integrations
+server.ts · api/ · src/db/           Existing API, serverless entry points, schema
+public/fonts/ · public/licenses/    Local font files and third-party notices
+```
+
+The application retains its state-based public navigation. Motion uses the installed **Motion for React** library with lazy-loaded features, CSS transforms/keyframes, native scrolling, and cleaned-up observers/listeners. No additional animation engine, scroll hijacking, WebGL, or external pet service is required.
+
+## Existing application features
+
+Neon PostgreSQL remains the source of truth for CRM, projects, documents, contracts, reports, team profiles, company settings, inquiries, and published case studies. The Operations Portal uses authenticated APIs. Public bootstrap data includes published case studies, active team profiles, contact details, and branding. Staff manage publishing through **Public Website Content**; drafts are not returned by the public API. Saving dashboard changes refreshes dashboard and public data.
+
+Signed-in staff can create, edit, and delete reports. PDF-ready print views and CSV downloads use available project, client, contract, and audit data. The AI Project Scoping Wizard stores inquiries and recommendations in **Communications & Inquiries**, where staff can review, assign, and convert accepted requests into client/project records.
+
+The public AI assistant receives company settings and published case studies as context. Private dashboard records are not supplied to it. Missing or unavailable AI configuration returns an explicit service error.
+
+## Deployment
+
+The existing production address is **https://kobacsystems.vercel.app/**, connected to **`DDHDDHD3/kobac_systems`** in Vercel's **`abdallah-muses-projects`** scope. Deploy to that existing project; a separate project will not update its domain or inherit its integrations.
+
+Keep the repository root as the project root. The existing `vercel.json` builds Vite into `dist` and configures API functions. Production and Preview need their existing server-side `DATABASE_URL` and, for AI, `GEMINI_API_KEY`. This release does not change those settings or credentials.
+
+Release title: **frontend design v1.2**. Git tag: **`v1.2`**. Package version: **`1.2.0`**. A GitHub push is not proof of deployment: verify Vercel status, the deployed commit, and the production page. [Release notes](docs/releases/v1.2.md) record validation and limits.
+
+## Design & source credits
+
+- KOBAC's existing logo informed the forest/amber palette and three-leaf shape language.
+- [Fiddle Digital](https://fiddle.digital/) informed composition and motion research. Its proprietary artwork and source code were not copied.
+- The captured-layout scroll technique adapts [Codrops' ScrollBasedLayoutAnimations](https://github.com/codrops/ScrollBasedLayoutAnimations) under MIT. The [complete notice](public/licenses/codrops-scroll-layout.txt) is included.
+- Manrope is distributed locally under its [SIL Open Font License](public/fonts/Manrope-OFL.txt).
+- Project assets retain their original ownership; consult [their sources](public/projects/SOURCES.md) before reuse. Third-party notices do not license the whole repository.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the review checklist and release conventions.
