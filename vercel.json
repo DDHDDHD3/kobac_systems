@@ -9,6 +9,12 @@
     },
     "api/auth/login.ts": {
       "maxDuration": 60
+    },
+    "api/ai/chat.ts": {
+      "maxDuration": 60
+    },
+    "api/ai/scope.ts": {
+      "maxDuration": 60
     }
   }
 }
