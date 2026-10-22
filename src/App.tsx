@@ -4,6 +4,15 @@ import { KobacCompanion } from './components/KobacCompanion';
 import { LazyMotion, MotionConfig, m } from 'motion/react';
 const loadMotionFeatures = () => import('./components/motion-features').then(module => module.default);
 
+async function readAiResponse<T>(response: Response, serviceName: string): Promise<T> {
+  const responseText = await response.text();
+  try {
+    return JSON.parse(responseText) as T;
+  } catch {
+    throw new Error(`${serviceName} returned a non-JSON response (HTTP ${response.status}). Check the Vercel API deployment.`);
+  }
+}
+
 // ==========================================
 // BRAND LOGO COMPONENT
 // ==========================================
@@ -449,7 +458,7 @@ function ProjectRequestWizard({ setSubPage }: { setSubPage: (p: 'home' | 'servic
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      const data = await res.json();
+      const data = await readAiResponse<{ error?: string; recommendation?: string }>(res, 'AI project scoping');
       if (!res.ok) throw new Error(data.error || 'Unable to generate a recommendation. Please try again.');
       if (typeof data.recommendation !== 'string' || !data.recommendation.trim()) {
         throw new Error('The scoping service returned an empty recommendation. Please try again.');
@@ -3127,9 +3136,11 @@ function AiChatAssistant() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMsg, history: messages.slice(-8) })
       });
-      const data = await res.json();
+      const data = await readAiResponse<{ error?: string; response?: string; reply?: string }>(res, 'AI chat');
       if (!res.ok) throw new Error(data.error || 'AI chat is temporarily unavailable.');
-      setMessages(prev => [...prev, { role: 'assistant', text: data.response || data.reply }]);
+      const reply = data.response || data.reply;
+      if (!reply?.trim()) throw new Error('AI chat returned an empty response. Please try again.');
+      setMessages(prev => [...prev, { role: 'assistant', text: reply }]);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'AI chat is temporarily unavailable. Please try again.';
       setMessages(prev => [...prev, { role: 'assistant', text: message }]);

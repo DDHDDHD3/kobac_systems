@@ -122,7 +122,7 @@ The public AI assistant receives company settings and published case studies as 
 
 The existing production address is **https://kobacsystems.vercel.app/**, connected to **`DDHDDHD3/kobac_systems`** in Vercel's **`abdallah-muses-projects`** scope. Deploy to that existing project; a separate project will not update its domain or inherit its integrations.
 
-Keep the repository root as the project root. The existing `vercel.json` builds Vite into `dist` and configures API functions. Production and Preview need their existing server-side `DATABASE_URL` and, for AI, `GEMINI_API_KEY`. This release does not change those settings or credentials.
+Keep the repository root as the project root. The existing `vercel.json` builds Vite into `dist` and configures API functions. In Vercel project settings, add `GEMINI_API_KEY` as a server-side environment variable for every environment where AI should work (Production and Preview as applicable); do not name it `VITE_GEMINI_API_KEY`. Save the setting and redeploy so the function receives it. Production and Preview also need their existing server-side `DATABASE_URL`. Check `/api/health` on the deployment: `aiConfigured` should be `true` without exposing the key.
 
 Release title: **frontend design v1.2**. Git tag: **`v1.2`**. Package version: **`1.2.0`**. A GitHub push is not proof of deployment: verify Vercel status, the deployed commit, and the production page. [Release notes](docs/releases/v1.2.md) record validation and limits.
 

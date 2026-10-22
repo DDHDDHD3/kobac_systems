@@ -45,7 +45,7 @@ const sql = neon(connectionString);
 export const db = drizzle(sql, { schema });
 
 // Initialize Gemini API if key is available
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = process.env.GEMINI_API_KEY?.trim();
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 const PROJECT_SOLUTION_TYPES = [
   'Business Management Systems',
@@ -691,6 +691,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.get('/api/health', (_req, res) => {
   res.status(databaseConfigured ? 200 : 503).json({
     status: databaseConfigured ? 'ok' : 'database_not_configured',
+    aiConfigured: Boolean(apiKey),
     port: PORT,
     error: databaseConfigured
       ? undefined
